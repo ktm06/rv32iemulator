@@ -1,18 +1,8 @@
-#include <stdint.h>
-#define mem_size (1024 * 1024) // 1MB memory allocation
+#include "cpu.h"
 
-
-// CPU structure: 32 registers, pc starting @ 0, 1MB memory
-struct CPU {
-    uint32_t registers[32];
-    uint32_t pc;
-    uint8_t memory[mem_size];
-};
-
-struct CPU reset(void) {
+void reset(struct CPU *cpu) {
     // 0 initialize struct
-    struct CPU cpu = {0};
-    return cpu;
+    *cpu = (struct CPU) {0};
 }
 
 uint8_t byte_read(struct CPU *cpu, uint32_t addr) {
@@ -56,6 +46,7 @@ void word_write(struct CPU *cpu, uint32_t addr, uint32_t value) {
 
 // cpu fetch execute cycle
 
+
 void step(struct CPU *cpu) {
     uint32_t instruction = word_read(cpu, cpu->pc);
     cpu->pc += 4;
@@ -79,6 +70,7 @@ void step(struct CPU *cpu) {
         case 0b1101111: //JTYPE
             break;
         case 0b0110011: //RTYPE
+            exec_r(cpu, instruction);
             break;
         default:
         break;
@@ -87,10 +79,58 @@ void step(struct CPU *cpu) {
 
 
 
-uint32_t exec_r(struct CPU *cpu, uint32_t instruction) {
+void exec_r(struct CPU *cpu, uint32_t instruction) {
+    // bit shifting & mask
     uint32_t rd = instruction >> 7 & 0x1F;
     uint32_t funct3 = instruction >> 12 & 0x07;
-    uint32_t rs1= instruction >> 15 & 0x1F;
-    uint32_t rs2 = instruction >> 20 & 0x1F;
+    uint32_t rs1_addr= instruction >> 15 & 0x1F;
+    uint32_t rs2_addr = instruction >> 20 & 0x1F;
     uint32_t funct7 = instruction >> 25 & 0x7F;
+
+    uint32_t rs1 = cpu->registers[rs1_addr];
+    uint32_t rs2 = cpu->registers[rs2_addr];
+
+    switch (funct3) {
+        case (0x0): // add or sub
+        if (funct7 == 0) {
+            cpu->registers[rd] = rs1 + rs2;
+        } else {
+            cpu->registers[rd] = rs1 -rs2;
+        }
+            break;
+        case (0x1): // sll logical shift left
+            cpu->registers[rd] = rs1 << (rs2 & 0x1F);
+            break;
+        case (0x2): // slt if rs1 < rs2 place 1 in addr else 0
+        // op needs us to turn it into a signed
+            if ((int32_t)rs1 < (int32_t)rs2) {
+                cpu->registers[rd] = 1;
+            } else {
+                cpu->registers[rd] = 0;
+            }
+            break;
+        case (0x3): // same as above but for unsigned
+            if (rs1 < rs2) {
+                cpu->registers[rd] = 1;
+            } else {
+                cpu->registers[rd] = 0;
+            }
+            break;
+        case (0x4): // xor
+            cpu->registers[rd] = rs1 ^ rs2;
+            break;
+        case (0x5): // srl logical shift right or arithmatic shift right
+            if (funct7 == 0) { 
+                cpu->registers[rd] = rs1 >> (rs2 & 0x1F); //srl
+            } else {
+                cpu->registers[rd] = (int32_t) rs1 >> (rs2 & 0x1F);// sra
+            }
+            break;
+        case (0x6): // or
+            cpu->registers[rd] = rs1 | rs2;
+            break;
+        case (0x7): // and
+            cpu->registers[rd] = rs1 & rs2;
+            break;
+    }
 }

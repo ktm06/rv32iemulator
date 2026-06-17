@@ -56,8 +56,10 @@ void step(struct CPU *cpu) {
         case 0b1100111: //JALR
             break;
         case 0b0000011: //LOAD
+            exec_l(cpu, instruction);
             break; 
         case 0b0010011: //ITYPE
+            exec_i(cpu, instruction);
             break;
         case 0b0100011: //STYPE
             break;
@@ -76,8 +78,6 @@ void step(struct CPU *cpu) {
         break;
     }
 }
-
-
 
 void exec_r(struct CPU *cpu, uint32_t instruction) {
     // bit shifting & mask
@@ -101,7 +101,7 @@ void exec_r(struct CPU *cpu, uint32_t instruction) {
         case (0x1): // sll logical shift left
             cpu->registers[rd] = rs1 << (rs2 & 0x1F);
             break;
-        case (0x2): // slt if rs1 < rs2 place 1 in addr else 0
+        case (0x2): // slt set less than if rs1 < rs2 place 1 in addr else 0
         // op needs us to turn it into a signed
             if ((int32_t)rs1 < (int32_t)rs2) {
                 cpu->registers[rd] = 1;
@@ -109,7 +109,7 @@ void exec_r(struct CPU *cpu, uint32_t instruction) {
                 cpu->registers[rd] = 0;
             }
             break;
-        case (0x3): // same as above but for unsigned
+        case (0x3): // sltu same as above but for unsigned
             if (rs1 < rs2) {
                 cpu->registers[rd] = 1;
             } else {
@@ -133,4 +133,93 @@ void exec_r(struct CPU *cpu, uint32_t instruction) {
             cpu->registers[rd] = rs1 & rs2;
             break;
     }
+}
+
+void exec_i(struct CPU *cpu, uint32_t instruction) {
+    uint32_t rd = instruction >> 7 & 0x1F;
+    uint32_t funct3 = instruction >> 12 & 0x7;
+    uint32_t rs1_addr = instruction >> 15 & 0x1F;
+    uint32_t imm = instruction >> 20 & 0xFFF;
+
+    // sign extensions i.e. if msb is 1, make all left 1, else make all left 0
+    if ((imm & 0x800) == 0x800) {
+        imm |= 0xFFFFF000;
+    } else {
+        imm &= 0x00000FFF;
+    }
+    uint32_t rs1 = cpu->registers[rs1_addr];
+    switch (funct3) {
+        case (0x0): // addi
+        cpu->registers[rd] = imm + rs1;
+            break;
+        case (0x1): // slli
+        cpu->registers[rd] = rs1 << (imm & 0x1F);
+            break; 
+        case (0x2): // slti
+        if ((int32_t) rs1 < (int32_t) imm) {
+            cpu->registers[rd] = 1;
+        } else {
+            cpu->registers[rd] = 0;
+        }
+            break;
+        case (0x3): // sltiu
+        if (rs1 < imm) {
+            cpu->registers[rd] = 1;
+        } else {
+            cpu->registers[rd] = 0;
+        }
+            break;
+        case (0x4): // xori
+            cpu->registers[rd] = rs1 ^ imm;
+            break;
+        case (0x5): // srli or srai
+            if ((imm >> 5) == 0) {
+                cpu->registers[rd] = rs1 >> (imm & 0x1F);
+            } else {
+                cpu->registers[rd] = (int32_t) rs1 >> (imm & 0x1F);
+            }
+            break;
+        case (0x6): // ori
+        cpu->registers[rd] = imm | rs1;
+            break;
+        case (0x7): // andi
+        cpu->registers[rd] = imm & rs1;
+            break;
+    }
+
+}
+
+void exec_l(struct CPU *cpu, uint32_t instruction) {
+    uint32_t rd = instruction >> 7 & 0x1F;
+    uint32_t funct3 = instruction >> 12 & 0x7;
+    uint32_t rs1_addr = instruction >> 15 & 0x1F;
+    uint32_t offset = instruction >> 20 & 0xFFF;   
+    if ((offset & 0x800) == 0x800) {
+        offset |= 0xFFFFF000;
+    } else {
+        offset &= 0x00000FFF;
+    }
+    uint32_t rs1 = cpu->registers[rs1_addr];
+
+    switch (funct3) {
+        case (0x0): // lb 8bit load w sign extend
+            cpu->registers[rd] = (int32_t)(int8_t)byte_read(cpu,(offset + rs1));
+            break;
+        case (0x1): // lh 16bit load w sign etend
+            cpu->registers[rd] = (int32_t)(int16_t)word_read(cpu, (offset + rs1));
+            break;
+        case (0x2): // lw 32bit load
+            cpu->registers[rd] = word_read(cpu, (offset  + rs1));
+            break;
+        case (0x4): // lbu 8 bit load w 0 extend 
+            cpu->registers[rd] = byte_read(cpu, ((offset + rs1))); 
+            break;
+        case (0x5): // lhu 16 bit load w 0 extend
+            cpu->registers[rd] = word_read(cpu, (offset + rs1)) & 0xFFFF;
+            break;
+        default:
+            break;
+    }
+
+
 }

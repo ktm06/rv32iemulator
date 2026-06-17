@@ -14,3 +14,5 @@ uint32_t word_read(struct CPU *cpu, uint32_t addr);
 void word_write(struct CPU *cpu, uint32_t addr, uint32_t value);
 void step(struct CPU *cpu);
 void exec_r(struct CPU *cpu, uint32_t instruction);
+void exec_i(struct CPU *cpu, uint32_t instruction);
+void exec_l(struct CPU *cpu, uint32_t instruction);

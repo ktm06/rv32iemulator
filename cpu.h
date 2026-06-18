@@ -16,3 +16,6 @@ void step(struct CPU *cpu);
 void exec_r(struct CPU *cpu, uint32_t instruction);
 void exec_i(struct CPU *cpu, uint32_t instruction);
 void exec_l(struct CPU *cpu, uint32_t instruction);
+void exec_s(struct CPU *cpu, uint32_t instruction);
+void exec_b(struct CPU *cpu, uint32_t instruction);
+void exec_jalr(struct CPU *cpu, uint32_t instruction);

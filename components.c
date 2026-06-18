@@ -54,6 +54,7 @@ void step(struct CPU *cpu) {
     uint32_t opcode = instruction & 0x7F;
     switch (opcode) {
         case 0b1100111: //JALR
+            exec_jalr(cpu, instruction);
             break;
         case 0b0000011: //LOAD
             exec_l(cpu, instruction);
@@ -62,8 +63,10 @@ void step(struct CPU *cpu) {
             exec_i(cpu, instruction);
             break;
         case 0b0100011: //STYPE
+            exec_s(cpu, instruction);
             break;
         case 0b1100011: //SBTYPE
+            exec_b(cpu, instruction);
             break;
         case 0b0110111: //UTYPE1
             break;
@@ -222,4 +225,112 @@ void exec_l(struct CPU *cpu, uint32_t instruction) {
     }
 
 
+}
+
+void exec_s(struct CPU *cpu, uint32_t instruction) {
+    uint32_t offset5 = instruction >> 7 & 0x1F;
+    uint32_t funct3 = instruction >> 12 & 0x7;
+    uint32_t rs1_addr = instruction >> 15 & 0x1F;
+    uint32_t rs2_addr = instruction >> 20 & 0x1F;
+    uint32_t offset7 = instruction >> 25 & 0x7F;
+
+    // combine offset
+    uint32_t offset = offset5 | (offset7 << 5);
+
+    if ((offset & 0x800) == 0x800) {
+        offset |= 0xFFFFF000;
+    } else {
+        offset &= 0x00000FFF;
+    }
+
+    switch (funct3) {
+        case (0x0): // sb
+            byte_write(cpu, (cpu->registers[rs1_addr] + offset), (cpu->registers[rs2_addr] & 0xFF));
+            break;
+        case (0x1): // sh
+            byte_write(cpu, (cpu->registers[rs1_addr] + offset), ((cpu->registers[rs2_addr] & 0xFF)));
+            byte_write(cpu, (cpu->registers[rs1_addr] + offset + 1), ((cpu->registers[rs2_addr] >> 8) & 0xFF));
+            break;
+        case (0x2): // sw
+            word_write(cpu, (cpu->registers[rs1_addr] + offset), ((cpu->registers[rs2_addr] & 0xFFFFFFFF)));
+            break;
+        default:
+            break;
+    }
+}
+
+void exec_b(struct CPU *cpu, uint32_t instruction) {
+    // immediate is not ordered so decode using instr format
+    uint32_t funct3 = instruction >> 12 & 0x7;
+    uint32_t rs1_addr = instruction >> 15 & 0x1F;
+    uint32_t rs2_addr = instruction >> 20 & 0x1F;
+    uint32_t offset4_1 = instruction >> 8 & 0xF;
+    uint32_t offset10_5 = instruction >> 25 & 0x3F;
+    uint32_t offset11 = instruction >> 7 & 0x1;
+    uint32_t offset12 = instruction >> 31 & 0x1;
+    uint32_t rs1 = cpu->registers[rs1_addr];
+    uint32_t rs2 = cpu->registers[rs2_addr];
+    // rebuild offset
+    uint32_t offset = offset4_1 << 1| offset10_5 << 5 | offset11 << 11 | offset12 << 12;
+    
+    if ((offset & 0x1000) == 0x1000) {
+        offset |= 0xFFFFE000;
+    } else {
+        offset &= 0x00001FFF;
+    }
+
+    switch (funct3) {
+        case (0x0): // beq
+            if (rs1 == rs2) {
+                cpu->pc -= 4; // since we increment in step we must deincrement
+                cpu->pc += offset;
+            }
+            break;
+        case (0x1): // bne
+            if (rs1 != rs2) {
+                    cpu->pc -= 4; 
+                    cpu->pc += offset;
+            }
+            break;
+        case (0x4): // blt
+            if ((int32_t) rs1 < (int32_t) rs2) {
+                cpu->pc -= 4; 
+                cpu->pc += offset;
+            }
+            break;
+        case (0x5): // bge
+            if ((int32_t) rs1 >= (int32_t) rs2) {
+                cpu->pc -= 4; 
+                cpu->pc += offset;
+            }
+            break;
+        case (0x6): // bltu
+            if (rs1 < rs2) {
+                cpu->pc -= 4; 
+                cpu->pc += offset;
+            }
+            break;
+        case (0x7): // bgeu
+            if (rs1 >= rs2) {
+                cpu->pc -= 4; 
+                cpu->pc += offset;
+            }
+            break;
+        default:
+            break;
+    }
+}
+
+void exec_jalr(struct CPU *cpu, uint32_t instruction) {
+    uint32_t rd = instruction >> 7 & 0x1F;
+    uint32_t rs1_addr = instruction >> 15 & 0x1F;
+    uint32_t offset = instruction >> 20 & 0xFFF;
+    // sign extend
+    if ((offset & 0x800) == 0x800) {
+        offset |= 0xFFFFF000;
+    } else {
+        offset &= 0x00000FFF;
+    }
+    cpu->registers[rd] = cpu->pc;
+    cpu->pc = (cpu->registers[rs1_addr] + offset) & ~1; // force even by clearing lowest bit to 0
 }

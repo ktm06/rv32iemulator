@@ -3,13 +3,20 @@
 
 int main(void) {
     static struct CPU cpu; // make static to allow for memory
-    reset(&cpu); // initialize a new cpu
-    cpu.registers[1] = 5; // value 1 in addr 1
-    cpu.registers[2] = 3; // value 2 in addr 2
-    word_write(&cpu, 100, 42);
-    cpu.registers[1] = 100;
-    uint32_t inst = 0x03 | (3 << 7) | (2 << 12) | (1 << 15);  // lw x3, 0(x1)
+    reset(&cpu);
+    cpu.registers[1] = 5;
+    cpu.registers[2] = 5;   
+    uint32_t inst = 0x63 | (0 << 12) | (1 << 15) | (2 << 20) | (1 << 10);  // beq x1,x2, offset 8
     word_write(&cpu, 0, inst);
     step(&cpu);
-    printf("%u",cpu.registers[3]);
+    printf("%u\n", cpu.pc);
+    reset(&cpu);
+    cpu.registers[1] = 5;
+    cpu.registers[2] = 6;   
+    inst = 0x63 | (0 << 12) | (1 << 15) | (2 << 20) | (1 << 10);
+    word_write(&cpu, 0, inst);
+    step(&cpu);
+    printf("%u\n", cpu.pc);
+
+    return 0;
 }

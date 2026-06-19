@@ -5,6 +5,8 @@ struct CPU {
     uint32_t registers[32];
     uint32_t pc;
     uint8_t memory[mem_size];
+    uint8_t stop;
+    uint32_t csr[4096];
 };
 
 void reset(struct CPU *cpu);
@@ -19,3 +21,7 @@ void exec_l(struct CPU *cpu, uint32_t instruction);
 void exec_s(struct CPU *cpu, uint32_t instruction);
 void exec_b(struct CPU *cpu, uint32_t instruction);
 void exec_jalr(struct CPU *cpu, uint32_t instruction);
+void exec_jal(struct CPU * cpu, uint32_t instruction);
+void exec_lui(struct CPU * cpu, uint32_t instruction);
+void exec_auipc(struct CPU *cpu, uint32_t instruction);
+void exec_sys(struct CPU * cpu, uint32_t instruction);

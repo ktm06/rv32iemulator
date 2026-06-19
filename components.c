@@ -68,18 +68,25 @@ void step(struct CPU *cpu) {
         case 0b1100011: //SBTYPE
             exec_b(cpu, instruction);
             break;
-        case 0b0110111: //UTYPE1
+        case 0b0110111: //UTYPE1/LUI
+            exec_lui(cpu, instruction);
             break;
-        case 0b0010111: //UTYPE2
+        case 0b0010111: // UTYPE2/AUIPC
+            exec_auipc(cpu, instruction);
             break;
-        case 0b1101111: //JTYPE
+        case 0b1101111: //JAL
+            exec_jal(cpu, instruction);
             break;
         case 0b0110011: //RTYPE
             exec_r(cpu, instruction);
             break;
+        case 0b1110011: // SYSTEM
+            exec_sys(cpu, instruction);
         default:
+            cpu->stop = 0x1;
         break;
     }
+    cpu->registers[0] = 0; // risc rule of 0 @ 0
 }
 
 void exec_r(struct CPU *cpu, uint32_t instruction) {
@@ -221,6 +228,7 @@ void exec_l(struct CPU *cpu, uint32_t instruction) {
             cpu->registers[rd] = word_read(cpu, (offset + rs1)) & 0xFFFF;
             break;
         default:
+            cpu->stop = 0x1;
             break;
     }
 
@@ -255,6 +263,7 @@ void exec_s(struct CPU *cpu, uint32_t instruction) {
             word_write(cpu, (cpu->registers[rs1_addr] + offset), ((cpu->registers[rs2_addr] & 0xFFFFFFFF)));
             break;
         default:
+            cpu->stop = 0x1;
             break;
     }
 }
@@ -317,6 +326,7 @@ void exec_b(struct CPU *cpu, uint32_t instruction) {
             }
             break;
         default:
+            cpu->stop = 0x1;
             break;
     }
 }
@@ -334,3 +344,121 @@ void exec_jalr(struct CPU *cpu, uint32_t instruction) {
     cpu->registers[rd] = cpu->pc;
     cpu->pc = (cpu->registers[rs1_addr] + offset) & ~1; // force even by clearing lowest bit to 0
 }
+
+void exec_jal(struct CPU *cpu, uint32_t instruction) {
+    uint32_t rd = instruction >> 7 & 0x1F;
+    
+    // like b-type, we need to rebuild offset 
+    uint32_t offset10_1 = instruction >> 21 & 0x3FF;
+    uint32_t offset11 = instruction >> 20 & 0x1;
+    uint32_t offset19_12 = instruction >> 12 & 0xFF;
+    uint32_t offset20 = instruction >> 31 & 0x1;
+    uint32_t offset = offset10_1 << 1 | offset11 << 11 | offset19_12 << 12 | offset20 << 20;
+    // sextend
+    if ((offset & 0x100000) == 0x100000) {
+        offset |= 0xFFE00000;
+    } else {
+        offset &= 0x001FFFFF;
+    }
+    cpu->registers[rd] = cpu->pc;
+    cpu->pc -= 4; // decrement for the 4 we move up
+    cpu->pc += offset;
+}
+
+void exec_lui(struct CPU *cpu, uint32_t instruction) {
+    uint32_t rd = instruction >> 7 & 0x1F;
+    uint32_t imm = instruction >> 12 & 0xFFFFF;
+    if ((imm & 0x80000) == 0x80000) {
+        imm |= 0xFFF00000;
+    } else {
+        imm &= 0x002FFFFF;
+    }
+    cpu->registers[rd] = imm << 12;
+}
+
+void exec_auipc(struct CPU *cpu, uint32_t instruction) {
+    uint32_t rd = instruction >> 7 & 0x1F;
+    uint32_t imm = instruction >> 12 & 0xFFFF;
+    if ((imm & 0x80000) == 0x80000) {
+        imm |= 0xFFF00000;
+    } else {
+        imm &= 0x002FFFFF;
+    }
+
+    cpu->registers[rd] = (imm<<12) + cpu->pc -4;
+}
+
+void exec_sys(struct CPU *cpu, uint32_t instruction) {
+    uint32_t rd = instruction >> 7 & 0x1F;
+    uint32_t funct3 = instruction >> 12 & 0x7;
+    uint32_t rs1_addr = instruction >> 15 & 0x1F;
+    uint32_t csr_addr = instruction >> 20 & 0xFFF;
+    uint32_t rs1 = cpu->registers[rs1_addr];
+    //0extend csr addr
+    uint32_t temp = cpu->csr[csr_addr];
+    switch (funct3) {
+        case (0x0):
+            switch (csr_addr) {
+                case (0): //ecall
+                    cpu->stop = 0x1;
+                    break;
+                case (0x1): //ebreak
+                    cpu->stop = 0x1;
+                    break;
+                case (0x2): //uret
+                    cpu->stop = 0x1;
+                    break;
+                case (0x102): // sret
+                    cpu->stop = 0x1;
+                    break;
+                case(0x302): //mret
+                    cpu->stop = 0x1;
+                    break;
+                case(0x105): //wfi
+                    break;
+                default: // for now also includes sfence vma
+                    cpu->stop = 0x1;
+                    break;
+            }
+            break;
+        case (0x1): // csrrw
+            cpu->csr[csr_addr] = rs1;
+            if (rd != 0) {
+                cpu->registers[rd] = temp;
+            }
+            break;
+        case(0x2): //csrrs
+            if (rs1_addr!=0) {
+                cpu->csr[csr_addr] = temp | rs1;
+            }
+            cpu->registers[rd] = temp;
+            break;
+        case(0x3): //csrrc
+            if (rs1_addr!=0) {
+                cpu->csr[csr_addr] = temp & ~rs1;
+            }
+            cpu->registers[rd] = temp;
+            break;
+        case(0x5): //csrrwi
+            if (rd!= 0) {
+                cpu->registers[rd] = temp;
+            }
+            cpu->csr[csr_addr] = rs1_addr; //uimm 
+            break;
+        case(0x6): //csrrsi
+            if (rs1_addr!=0) {
+                cpu->csr[csr_addr] = temp | rs1_addr; 
+            }
+            cpu->registers[rd] = temp;
+            break;
+        case(0x7): //csrrci
+            if (rs1_addr!=0) {
+                cpu->csr[csr_addr] = temp & ~rs1_addr;
+            }
+            cpu->registers[rd] = temp;
+            break;
+        default:
+            cpu->stop = 0x1;
+            break;
+        }
+    }

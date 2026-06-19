@@ -4,19 +4,10 @@
 int main(void) {
     static struct CPU cpu; // make static to allow for memory
     reset(&cpu);
-    cpu.registers[1] = 5;
-    cpu.registers[2] = 5;   
-    uint32_t inst = 0x63 | (0 << 12) | (1 << 15) | (2 << 20) | (1 << 10);  // beq x1,x2, offset 8
+    cpu.registers[5] = 0xFF;
+    uint32_t inst = 0x73 | (3 << 7) | (1 << 12) | (5 << 15) | (0x340 << 20);  // csrrw x3, 0x340, x5
     word_write(&cpu, 0, inst);
     step(&cpu);
-    printf("%u\n", cpu.pc);
-    reset(&cpu);
-    cpu.registers[1] = 5;
-    cpu.registers[2] = 6;   
-    inst = 0x63 | (0 << 12) | (1 << 15) | (2 << 20) | (1 << 10);
-    word_write(&cpu, 0, inst);
-    step(&cpu);
-    printf("%u\n", cpu.pc);
-
-    return 0;
+    printf("csr=%X\n", cpu.csr[0x340]);
+    printf("x3=%X\n", cpu.registers[3]);;
 }

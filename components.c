@@ -121,6 +121,16 @@ void loadinstr(struct CPU *cpu,uint32_t *instr) {
         i += 4;
     }
 }
+
+void loadfile(struct CPU *cpu, char *filename) {
+    FILE *f = fopen(filename, "rb");
+    if (f==NULL) {
+        puts("Failed to read file");
+        return;
+    }
+    fread(cpu->memory, 1, mem_size, f);
+    fclose(f);
+}
 // execute functions
 
 void exec_r(struct CPU *cpu, uint32_t instruction) {
@@ -413,9 +423,11 @@ void exec_jalr(struct CPU *cpu, uint32_t instruction) {
         offset &= 0x00000FFF;
     }
     if (debug) printf("JALR: x%u = pc+4, pc = (%u@x%u + %u)&~1\n", rd, cpu->registers[rs1_addr], rs1_addr, offset);
-    cpu->registers[rd] = cpu->pc;
+    
+    uint32_t temp=cpu->pc;
     
     cpu->pc = (cpu->registers[rs1_addr] + offset) & ~1; // force even by clearing lowest bit to 0
+    cpu->registers[rd] = temp;
 }
 
 void exec_jal(struct CPU *cpu, uint32_t instruction) {

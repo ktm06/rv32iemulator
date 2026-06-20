@@ -17,6 +17,7 @@ void byte_write(struct CPU *cpu, uint32_t addr, uint8_t value);
 uint32_t word_read(struct CPU *cpu, uint32_t addr);
 void word_write(struct CPU *cpu, uint32_t addr, uint32_t value);
 void step(struct CPU *cpu);
+
 void exec_r(struct CPU *cpu, uint32_t instruction);
 void exec_i(struct CPU *cpu, uint32_t instruction);
 void exec_l(struct CPU *cpu, uint32_t instruction);
@@ -27,6 +28,8 @@ void exec_jal(struct CPU * cpu, uint32_t instruction);
 void exec_lui(struct CPU * cpu, uint32_t instruction);
 void exec_auipc(struct CPU *cpu, uint32_t instruction);
 void exec_sys(struct CPU * cpu, uint32_t instruction);
+
 void run(struct CPU * cpu);
 void regview(struct CPU * cpu);
 void loadinstr(struct CPU * cpu, uint32_t *instr);
+void loadfile(struct CPU * cpu, char * filename);

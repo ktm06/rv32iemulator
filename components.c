@@ -144,7 +144,7 @@ void exec_r(struct CPU *cpu, uint32_t instruction) {
 
     uint32_t rs1 = cpu->registers[rs1_addr];
     uint32_t rs2 = cpu->registers[rs2_addr];
-
+    if (funct7 == 0) {
     switch (funct3) {
         case (0x0): // add or sub
         if (funct7 == 0) {
@@ -199,6 +199,65 @@ void exec_r(struct CPU *cpu, uint32_t instruction) {
             cpu->registers[rd] = rs1 & rs2;
             break;
     }
+} else if (funct7 == (0x1)) {
+    //M extension
+    switch (funct3) {
+        case (0x0): //mul
+            cpu->registers[rd] = rs1 * rs2;
+            break;
+        case (0x1): {//mulh
+            int64_t temp = (int64_t)(int32_t)rs1 * (int64_t)(int32_t)rs2;
+            cpu->registers[rd] = (uint32_t) (temp >> 32);
+            break;
+        }
+        case (0x2): {//mulhsu
+            int64_t temp = (int64_t)(int32_t)rs1 * (uint64_t)rs2;
+            cpu->registers[rd] = (uint32_t) (temp >> 32);
+            break;
+        }
+        case (0x3):{ //mulhu
+            uint64_t temp = (uint64_t)rs1 * (uint64_t)rs2;
+            cpu->registers[rd] = (uint32_t) (temp >> 32);
+            break;
+        }
+        case (0x4): //div
+            if (rs2 == 0) {
+                cpu->registers[rd] = 0xFFFFFFFF;
+            } else if (rs2 == 0xFFFFFFFF && rs1 == 0x80000000){
+                cpu->registers[rd] = 0x80000000;
+            } else {
+                cpu->registers[rd] = (int32_t)rs1 / (int32_t)rs2;
+            }
+            break;
+        case (0x5): //divu
+        if (rs2 == 0){
+            cpu->registers[rd] = 0xFFFFFFFF;
+        } else {
+            cpu->registers[rd] = rs1 / rs2;
+        }
+            break;
+        case (0x6): //rem
+        if (rs2 == 0) {
+                cpu->registers[rd] = rs1;
+            } else if (rs2 == 0xFFFFFFFF && rs1 == 0x80000000){
+                cpu->registers[rd] = 0;
+            } else {
+                cpu->registers[rd] = (int32_t)rs1 % (int32_t)rs2;
+            }
+            break;
+        case (0x7): //remu
+            if (rs2 == 0){
+            cpu->registers[rd] = rs1;
+        } else {
+            cpu->registers[rd] = rs1 % rs2;
+        }
+            break;
+    }
+} else {
+    if (debug) printf("bad instruction, R-type\n");
+    cpu->stop = 0x1;
+}
+
 }
 
 void exec_i(struct CPU *cpu, uint32_t instruction) {

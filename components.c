@@ -3,6 +3,7 @@
 void reset(struct CPU *cpu) {
     // 0 initialize struct
     *cpu = (struct CPU) {0};
+    cpu->registers[2] = mem_size - 4; //sp
 }
 
 uint8_t byte_read(struct CPU *cpu, uint32_t addr) {

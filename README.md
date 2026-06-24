@@ -1,7 +1,24 @@
 **Overview**:
-This is a RISC-V CPU emulator containing the base RV32IM + Zicsr extension instructions. 
 
-Currently, it runs both hand written programs and compiled C binaries.
+This is a RISC-V CPU emulator containing the base RV32IM + Zicsr extension instructions. Currently, it runs both hand written programs and compiled C binaries. 
+
+**Architecture**:
+
+The emulator replicates a CPU by executing insturctions through the fetch-decode-exeucte loop:
+
+1. Fetch the instruction located at program counter's address in memory
+
+2. Decode the instruction via opcode and determine operation
+
+3. Execute the intruction, and program counter points to the next instruction.
+
+The CPU has 32 general-purpose 32-bit registers. We follow RISC-V convention by hardwiring x0 to 0 and setting x1 to the stack pointer. x10 is used as the main() function return value. We also have a separate, CSR bank, used by our Ziscr extension. 
+
+RISC-V is a Von Neumann architecture, so our instruction and data live in the same memory. Our emulator is 64KB of memory.
+
+The emulator replicates a RISC-V CPU behaviorally. It is not pipelined or cycle-accurate. 
+
+**Quick Start**:
 
 To compile C code to .bin file: 
 1. Have RISC-V GNU Compiler Toolchain (on linux/wsl:  ```sudo apt install gcc-riscv64-unknown-elf```)
